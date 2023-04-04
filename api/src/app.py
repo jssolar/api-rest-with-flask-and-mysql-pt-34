@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_migrate import Migrate
 from flask_cors import CORS
@@ -132,14 +133,14 @@ def obtener_crear_users():
 @app.route('/messages/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @jwt_required()
 def messages(id = None):
-
+    print(datetime.now())
     current_user = get_jwt_identity()
 
     if request.method == 'GET':
         if id is not None:
             message = Message.query.filter_by(id=id, users_from_id=current_user).first()
             if not message:
-                return jsonify({ "msg": "Message not foun"}), 404
+                return jsonify({ "msg": "Message not found"}), 404
 
             return jsonify(message.serialize()), 200
         else:
