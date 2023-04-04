@@ -132,12 +132,18 @@ def obtener_crear_users():
 @app.route('/messages/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @jwt_required()
 def messages(id = None):
+
+    current_user = get_jwt_identity()
+
     if request.method == 'GET':
         if id is not None:
-            message = Message.query.get(id)
+            message = Message.query.filter_by(id=id, users_from_id=current_user).first()
+            if not message:
+                return jsonify({ "msg": "Message not foun"}), 404
+
             return jsonify(message.serialize()), 200
         else:
-            messages = Message.query.all()
+            messages = Message.query.filter_by(users_from_id=current_user)
             messages = list(map(lambda msg: msg.serialize(), messages))
 
             return jsonify(messages), 200
