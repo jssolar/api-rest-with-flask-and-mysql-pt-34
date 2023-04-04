@@ -2,7 +2,8 @@ import os
 from flask import Flask, request, jsonify
 from flask_migrate import Migrate
 from flask_cors import CORS
-from models import db, User, Profile
+from flask_jwt_extended import JWTManager, get_jwt_identity, jwt_required, create_access_token
+from models import db, User, Profile, Message, Role
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -14,9 +15,11 @@ app.config['DEBUG'] = True
 app.config['ENV'] = 'development'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
+app.config['JWT_SECRET_KEY'] = 'secret-key'
 
 db.init_app(app)
 Migrate(app, db) # db init, db migrate, db upgrade, db downgrade
+jwt = JWTManager(app)
 CORS(app)
 
 @app.route('/')
@@ -26,7 +29,43 @@ def main():
     }), 200
 
 
+@app.route('/login', methods=['POST'])
+def login():
+
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    if not username:
+        return jsonify({ "msg": "Username is required"}), 422
+
+    if not password:
+        return jsonify({ "msg": "Password is required"}), 422
+
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return jsonify({ "msg": "Username/Password are incorrects"}), 401
+
+    if not check_password_hash(user.password, password):
+        return jsonify({ "msg": "Username/Password are incorrects"}), 401
+
+    # Token con vencimiento 
+    # expires = datetime.timedelta(days=3)
+    # access_token = create_access_token(identity=user.id, expires_delta=expires)
+    
+    # Token sin vencimiento
+    access_token = create_access_token(identity=user.id)
+
+    data = {
+        "access_token": access_token,
+        "user": user.serialize_with_profile()
+    }
+
+    return jsonify(data), 200
+
+
 @app.route('/users', methods=['GET', 'POST'])
+@jwt_required() # que todas estas rutas o endpoints son privadas
 def obtener_crear_users():
     if request.method == 'GET':
         users = User.query.all()
@@ -43,6 +82,12 @@ def obtener_crear_users():
         github = request.json.get('github', "")
         linkedin = request.json.get('linkedin', "")
         instagram = request.json.get('instagram', "")
+
+        # Datos de la tabla roles
+        roles = request.json.get('roles')
+
+        
+                
 
         """ 
         user = User()
@@ -71,12 +116,53 @@ def obtener_crear_users():
         profile.linkedin = linkedin
         profile.instagram = instagram
 
+        if len(roles) > 0:
+            for roles_id in roles:
+                role = Role.query.get(roles_id)
+                user.roles.append(role)
+
         # usando el relationship para crear el usuario con su perfil
         user.profile = profile
         user.save()
 
         return jsonify(user.serialize_with_profile()), 201
 
+
+@app.route('/messages', methods=['GET', 'POST'])
+@app.route('/messages/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@jwt_required()
+def messages(id = None):
+    if request.method == 'GET':
+        if id is not None:
+            message = Message.query.get(id)
+            return jsonify(message.serialize()), 200
+        else:
+            messages = Message.query.all()
+            messages = list(map(lambda msg: msg.serialize(), messages))
+
+            return jsonify(messages), 200
+
+
+    if request.method == 'POST':
+        message = request.json.get('message')
+        users_from_id = request.json.get('users_from_id')
+        users_to_id = request.json.get('users_to_id')
+
+        msg = Message()
+        msg.message = message
+        msg.users_from_id = users_from_id
+        msg.users_to_id = users_to_id
+
+        msg.save()
+
+        return jsonify(msg.serialize()), 201
+
+
+    if request.method == 'PUT':
+        pass
+
+    if request.method == 'DELETE':
+        pass
 
 if __name__ == '__main__':
     app.run()
