@@ -33,6 +33,7 @@ const injectContext = PassComponent => {
                 state.actions.getMessages();
             }
         }, [state.store.currentUser]) 
+        
         return (
             <Context.Provider value={state}>
                 <PassComponent {...props} />
