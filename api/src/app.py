@@ -29,7 +29,6 @@ def main():
         "message": "API REST WITH FLASK AND MYSQL"
     }), 200
 
-
 @app.route('/login', methods=['POST'])
 def login():
 
@@ -64,6 +63,57 @@ def login():
 
     return jsonify(data), 200
 
+@app.route('/register', methods=['POST'])
+def register():
+
+    # Datos de la tabla "users"
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    # Datos de la tabla roles
+    roles = request.json.get('roles')
+
+    if not username:
+        return jsonify({ "msg": "Username is required"}), 422
+
+    if not password:
+        return jsonify({ "msg": "Password is required"}), 422
+
+    user = User.query.filter_by(username=username).first()
+
+    if user:
+        return jsonify({ "msg": "User already exists"}), 400
+
+    
+    user = User()
+    user.username = username
+    user.password = generate_password_hash(password)
+    user.is_active = True
+
+    profile = Profile()
+
+    if len(roles) > 0:
+        for roles_id in roles:
+            role = Role.query.get(roles_id)
+            user.roles.append(role)
+
+    # usando el relationship para crear el usuario con su perfil
+    user.profile = profile
+    user.save()
+
+    # Token con vencimiento 
+    # expires = datetime.timedelta(days=3)
+    # access_token = create_access_token(identity=user.id, expires_delta=expires)
+    
+    # Token sin vencimiento
+    access_token = create_access_token(identity=user.id)
+
+    data = {
+        "access_token": access_token,
+        "user": user.serialize_with_profile()
+    }
+
+    return jsonify(data), 200
 
 @app.route('/users', methods=['GET', 'POST'])
 @jwt_required() # que todas estas rutas o endpoints son privadas
@@ -127,7 +177,6 @@ def obtener_crear_users():
         user.save()
 
         return jsonify(user.serialize_with_profile()), 201
-
 
 @app.route('/messages', methods=['GET', 'POST'])
 @app.route('/messages/<int:id>', methods=['GET', 'PUT', 'DELETE'])
