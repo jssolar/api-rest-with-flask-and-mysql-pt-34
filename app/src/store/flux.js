@@ -8,6 +8,42 @@ const getState = ({ getStore, getActions, setStore }) => {
             messages: null
         },
         actions: {
+            register: async (e, navigate) => {
+                e.preventDefault()
+                try {
+                    const { API_URL } = getStore()
+                    const { username, password, role } = e.target;
+                    const credentials = { username: username.value, password: password.value, roles: [role.value] }
+
+                    const options = {
+                        method: 'POST',
+                        body: JSON.stringify(credentials),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+
+                    const response = await fetch(`${API_URL}/register`, options)
+                    const data = await response.json()
+
+                    if(data.msg){
+                        setStore({
+                            currentUser: null,
+                            error: data
+                        })
+                    } else {
+                        setStore({
+                            currentUser: data,
+                            error: null
+                        })
+                        sessionStorage.setItem('currentUser', JSON.stringify(data))
+                        navigate('/')
+                    }
+
+                } catch (error) {
+                    console.log(error.message)
+                }
+            },
             login: async (e, navigate) => {
                 e.preventDefault()
                 try {
